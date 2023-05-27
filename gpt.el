@@ -29,6 +29,9 @@
 
 ;;; Code:
 
+(defgroup gpt nil
+  "Interact with the GPT API")
+
 (defcustom gpt-system-message
   "You are an assistant built into Emacs that only responds in Emacs Lisp, never respond with plain text.
 The code you return will be evaluated in a temporary buffer.
@@ -39,18 +42,23 @@ Try to avoid defining new functions.
 If the user responds with the debugger output, do not respond in plain text, just output the correct code.
 Some messages may include the text of the current buffer. When that is the case, there will be a \"BUFFER TEXT\" heading and a \"USER MESSAGE\" heading."
   "The system message sent to GPT"
-  :type 'string)
+  :type 'string
+  :group 'gpt)
 
 (defcustom gpt-model "gpt-4"
   "ID of the chat model to use"
-  :type 'string)
+  :type 'string
+  :options '("gpt-4" "gpt-4-32k" "gpt-3.5-turbo")
+  :group 'gpt)
 
 (defcustom gpt-temperature 0.2
   "The sampling temperature to use"
-  :type 'number)
+  :type 'number
+  :group 'gpt)
 
 (defcustom gpt-api-key nil "The OpenAI api key"
-  :type 'string)
+  :type 'string
+  :group 'gpt)
 
 (defconst gpt-chat-default `(((role . system) (content . ,gpt-system-message))))
 
