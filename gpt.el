@@ -40,6 +40,14 @@ Some messages may include the text of the current buffer. When that is the case,
   "The system message sent to GPT"
   :type 'string)
 
+(defcustom gpt-model "gpt-4"
+  "ID of the chat model to use"
+  :type 'string)
+
+(defcustom gpt-temperature 0.2
+  "The sampling temperature to use"
+  :type 'number)
+
 (defcustom gpt-api-key nil "The OpenAI api key"
   :type 'string)
 
@@ -54,7 +62,7 @@ Some messages may include the text of the current buffer. When that is the case,
   (setq gpt-chat (cons `((role . assistant) (content . ,message)) gpt-chat)))
 
 (defun gpt--get-request ()
-  `((model . gpt-4) (messages . ,(reverse gpt-chat))))
+  `(("model" . ,gpt-model) ("temperature" . ,gpt-temperature) ("messages" . ,(reverse gpt-chat))))
 
 (defun gpt--eval-last-gpt-chat ()
   (let* ((last-message (car gpt-chat))
