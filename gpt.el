@@ -43,7 +43,9 @@ Some messages may include the text of the current buffer. When that is the case,
 (defcustom gpt-api-key nil "The OpenAI api key"
   :type 'string)
 
-(defvar gpt-chat `(((role . system) (content . ,gpt-system-message))))
+(defconst gpt-chat-default `(((role . system) (content . ,gpt-system-message))))
+
+(defvar gpt-chat gpt-chat-default)
 
 (defun gpt--add-user-chat (message)
   (setq gpt-chat (cons `((role . user) (content . ,(format "%s\nRespond only with Emacs Lisp." message))) gpt-chat)))
@@ -99,11 +101,6 @@ Some messages may include the text of the current buffer. When that is the case,
     (gpt--add-user-chat message)
     (gpt--send-request)))
 
-(defun gpt-reset-and-message ()
-  (interactive)
-  (gpt-reset)
-  (gpt-message))
-
 (defun gpt-message-buffer ()
   (interactive)
   (unless gpt-api-key
@@ -111,5 +108,10 @@ Some messages may include the text of the current buffer. When that is the case,
   (let ((message (read-string "Enter message: ")))
     (gpt--add-user-chat (gpt--message-with-buffer message))
     (gpt--send-request)))
+
+(defun gpt-reset ()
+  (interactive)
+  (setq gpt-chat gpt-chat-default))
+  
 
 (provide 'gpt)
