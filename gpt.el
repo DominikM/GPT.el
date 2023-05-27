@@ -31,6 +31,7 @@
 
 (defcustom gpt-system-message
   "You are an assistant built into Emacs that only responds in Emacs Lisp, never respond with plain text.
+The code you return will be evaluated in a temporary buffer.
 When you need additional information from the user, you can continue the conversation with the function (gpt--talk \"message from assistant\"). 
 Otherwise, you should default to using the function (message \"message from assistant\") for other communications.
 This code will be running in the Emacs Lisp evaluator.
@@ -55,6 +56,8 @@ Some messages may include the text of the current buffer. When that is the case,
 
 (defvar gpt-chat gpt-chat-default)
 
+(defvar gpt--waiting nil)
+
 (defun gpt--add-user-chat (message)
   (setq gpt-chat (cons `((role . user) (content . ,(format "%s\nRespond only with Emacs Lisp." message))) gpt-chat)))
 
@@ -73,6 +76,20 @@ Some messages may include the text of the current buffer. When that is the case,
 	  (insert content)
 	  (eval-buffer)))))
 
+(defun gpt--mode-line-format ()
+  (if gpt--waiting
+      "Waiting for GPT response..."
+    "Received messasge from GPT!"))
+
+(defun gpt--add-mode-line ()
+  (or (memq 'gpt--mode-line-format mode-line-misc-info)
+      (add-to-list 'mode-line-misc-info '(:eval (gpt--mode-line-format))))
+  (force-mode-line-update))
+
+(defun gpt--remove-mode-line ()
+  (setq mode-line-misc-info (delete '(:eval (gpt--mode-line-format)) mode-line-misc-info))
+  (force-mode-line-update))
+ 
 (defun gpt--message-with-buffer (message)
   (format "BUFFER TEXT\n%s\n\nUSER MESSAGE\n%s" (buffer-substring-no-properties (point-min) (point-max)) message))
 
@@ -94,7 +111,13 @@ Some messages may include the text of the current buffer. When that is the case,
 	      (message (cdr (assoc 'message choice)))
 	      (content (cdr (assoc 'content message))))
 	 (gpt--add-gpt-chat content)
-	 (gpt--eval-last-gpt-chat))))))
+	 (gpt--eval-last-gpt-chat))
+       (setq gpt--waiting nil)
+       (force-mode-line-update)
+       (run-at-time 2 nil (lambda ()
+			    (gpt--remove-mode-line))))))
+  (setq gpt--waiting t)
+  (gpt--add-mode-line))
 
 (defun gpt--talk (gpt-prompt)
   (let ((message (read-string gpt-prompt)))
@@ -120,6 +143,5 @@ Some messages may include the text of the current buffer. When that is the case,
 (defun gpt-reset ()
   (interactive)
   (setq gpt-chat gpt-chat-default))
-  
 
 (provide 'gpt)
