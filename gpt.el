@@ -34,7 +34,6 @@
 
 (defcustom gpt-system-message
   "You are an assistant built into Emacs that only responds in Emacs Lisp, never respond with plain text.
-The code you return will be evaluated in a temporary buffer.
 When you need additional information from the user, you can continue the conversation with the function (gpt--talk \"message from assistant\"). 
 Otherwise, you should default to using the function (message \"message from assistant\") for other communications.
 This code will be running in the Emacs Lisp evaluator.
@@ -75,14 +74,20 @@ Some messages may include the text of the current buffer. When that is the case,
 (defun gpt--get-request ()
   `(("model" . ,gpt-model) ("temperature" . ,gpt-temperature) ("messages" . ,(reverse gpt-chat))))
 
+(defun gpt--eval-next-form (content next-pos)
+  (if (< next-pos (length content))
+      (let* ((form-pos (read-from-string content next-pos))
+	     (form (car form-pos))
+	     (pos (cdr form-pos)))
+	(eval form)
+	(gpt--eval-next-form content pos))))
+
 (defun gpt--eval-last-gpt-chat ()
   (let* ((last-message (car gpt-chat))
 	 (role (cdr (assoc 'role last-message)))
 	 (content (cdr (assoc 'content last-message))))
     (if (eq role 'assistant)
-	(with-temp-buffer
-	  (insert content)
-	  (eval-buffer)))))
+	(gpt--eval-next-form content 0))))
 
 (defun gpt--mode-line-format ()
   (if gpt--waiting
@@ -119,7 +124,9 @@ Some messages may include the text of the current buffer. When that is the case,
 	      (message (cdr (assoc 'message choice)))
 	      (content (cdr (assoc 'content message))))
 	 (gpt--add-gpt-chat content)
-	 (gpt--eval-last-gpt-chat))
+	 (condition-case nil
+	     (gpt--eval-last-gpt-chat)
+	   (error nil)))
        (setq gpt--waiting nil)
        (force-mode-line-update)
        (run-at-time 2 nil (lambda ()
