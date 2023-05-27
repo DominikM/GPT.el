@@ -120,17 +120,17 @@ Some messages may include the text of the current buffer. When that is the case,
     :success
     (cl-function
      (lambda (&key data &allow-other-keys)
+       (setq gpt--waiting nil)
+       (force-mode-line-update)
+       (run-at-time 2 nil (lambda ()
+			    (gpt--remove-mode-line)))
        (let* ((choice (aref (cdr (assoc 'choices data)) 0))
 	      (message (cdr (assoc 'message choice)))
 	      (content (cdr (assoc 'content message))))
 	 (gpt--add-gpt-chat content)
 	 (condition-case nil
 	     (gpt--eval-last-gpt-chat)
-	   (error nil)))
-       (setq gpt--waiting nil)
-       (force-mode-line-update)
-       (run-at-time 2 nil (lambda ()
-			    (gpt--remove-mode-line))))))
+	   (error nil))))))
   (setq gpt--waiting t)
   (gpt--add-mode-line))
 
