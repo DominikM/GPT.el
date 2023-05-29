@@ -160,4 +160,30 @@ Some messages may include the text of the current buffer. When that is the case,
   (interactive)
   (setq gpt-chat gpt-chat-default))
 
+(defun gpt--curl-command-args (url data headers)
+  (append
+   (list "--silent")
+   (flatten-list (mapcar (lambda (header)
+			   (list "--header" (format "%s: %s" (car header) (cdr header))))
+			 headers))
+   (list "--data" (format "%s" data))))
+
+(defun gpt--stream-raw-handler (proc content)
+  (message (format "received:\n%s" content)))
+
+(defun gpt--stream-request-callback (proc event)
+  (cond
+   ((cl-search "finished" event)
+    (kill-buffer "*gpt-curl*"))))
+
+(defun gpt--stream-request ()
+  (let* ((url "https://api.openai.com/v1/chat/completions")
+	 (headers `(("Authorization" . ,(format "Bearer %s" gpt-api-key))
+		    ("Content-Type" . "application/json")))
+	 (data (json-encode (cons '("stream" . t) (gpt--get-request))))
+	 (proc (apply #'start-process "gpt-curl" "*gpt-curl*" "curl" url "--config" "-" (gpt--curl-command-args url data headers))))
+    (add-function :before (process-filter proc) #'gpt--stream-raw-handler)
+    (process-send-eof proc)
+    (set-process-sentinel proc #'gpt--stream-request-callback)))
+
 (provide 'gpt)
