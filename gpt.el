@@ -29,6 +29,10 @@
 
 ;;; Code:
 
+(require 'url)
+(require 'url-http)
+(require 'json)
+
 (defgroup gpt nil
   "Interact with the GPT API")
 
@@ -41,6 +45,11 @@ Try to avoid defining new functions.
 If the user responds with the debugger output, do not respond in plain text, just output the correct code.
 Some messages may include the text of the current buffer. When that is the case, there will be a \"BUFFER TEXT\" heading and a \"USER MESSAGE\" heading."
   "The system message sent to GPT"
+  :type 'string
+  :group 'gpt)
+
+(defcustom gpt-url "https://api.openai.com/v1/chat/completions"
+  "The base URL for the API"
   :type 'string
   :group 'gpt)
 
@@ -110,28 +119,27 @@ Some messages may include the text of the current buffer. When that is the case,
   (format "BUFFER TEXT\n%s\n\nUSER MESSAGE\n%s" (buffer-substring-no-properties (point-min) (point-max)) message))
 
 (defun gpt--send-request ()
-  (request
-    "https://api.openai.com/v1/chat/completions"
-    :type "POST"
-    :headers `(("Authorization" . ,(format "Bearer %s" gpt-api-key)) ("Content-Type" . "application/json"))
-    :data (json-encode (gpt--get-request))
-    :parser 'json-read
-    :success
-    (cl-function
-     (lambda (&key data &allow-other-keys)
-       (setq gpt--waiting nil)
-       (force-mode-line-update)
-       (run-at-time 2 nil (lambda ()
-			    (gpt--remove-mode-line)))
-       (let* ((choice (aref (alist-get 'choices data) 0))
-	      (message (alist-get 'message choice))
-	      (content (alist-get 'content message)))
-	 (gpt--add-gpt-chat content)
-	 (condition-case nil
-	     (gpt--eval-last-gpt-chat)
-	   (error nil)))))
+  (let ((url-request-data (json-encode (gpt--get-request)))
+	(url-request-method "POST")
+	(url-request-extra-headers `(("Authorization" . ,(format "Bearer %s" gpt-api-key)) ("Content-Type" . "application/json"))))
+    (url-retrieve gpt-url #'gpt--request-callback nil t))
   (setq gpt--waiting t)
-  (gpt--add-mode-line)))
+  (gpt--add-mode-line))
+
+(defun gpt--request-callback (status &rest cbargs)
+  (setq gpt--waiting nil)
+  (force-mode-line-update)
+  (run-at-time 2 nil (lambda () (gpt--remove-mode-line)))
+  (goto-char (point-min))
+  (search-forward "\n\n")
+  (let* ((data (json-read))
+	 (choice (aref (alist-get 'choices data) 0))
+	 (message (alist-get 'message choice))
+	 (content (alist-get 'content message)))
+    (gpt--add-gpt-chat content)
+    (condition-case nil
+	(gpt--eval-last-gpt-chat)
+      (error nil))))
 
 (defun gpt--talk (gpt-prompt)
   (let ((message (read-string gpt-prompt)))
@@ -159,31 +167,5 @@ Some messages may include the text of the current buffer. When that is the case,
 (defun gpt-reset ()
   (interactive)
   (setq gpt-chat gpt-chat-default))
-
-(defun gpt--curl-command-args (url data headers)
-  (append
-   (list "--silent")
-   (flatten-list (mapcar (lambda (header)
-			   (list "--header" (format "%s: %s" (car header) (cdr header))))
-			 headers))
-   (list "--data" (format "%s" data))))
-
-(defun gpt--stream-raw-handler (proc content)
-  (message (format "received:\n%s" content)))
-
-(defun gpt--stream-request-callback (proc event)
-  (cond
-   ((cl-search "finished" event)
-    (kill-buffer "*gpt-curl*"))))
-
-(defun gpt--stream-request ()
-  (let* ((url "https://api.openai.com/v1/chat/completions")
-	 (headers `(("Authorization" . ,(format "Bearer %s" gpt-api-key))
-		    ("Content-Type" . "application/json")))
-	 (data (json-encode (cons '("stream" . t) (gpt--get-request))))
-	 (proc (apply #'start-process "gpt-curl" "*gpt-curl*" "curl" url "--config" "-" (gpt--curl-command-args url data headers))))
-    (add-function :before (process-filter proc) #'gpt--stream-raw-handler)
-    (process-send-eof proc)
-    (set-process-sentinel proc #'gpt--stream-request-callback)))
 
 (provide 'gpt)
