@@ -168,4 +168,17 @@ Some messages may include the text of the current buffer. When that is the case,
   (interactive)
   (setq gpt-chat gpt-chat-default))
 
+(defun gpt-view-chat ()
+  (interactive)
+  (with-current-buffer (get-buffer-create "*GPT chat*")
+    (let ((inhibit-read-only t))
+      (erase-buffer)
+      (dolist (message (reverse gpt-chat))
+	(insert (format "%s:\n%s\n\n"
+			(capitalize (symbol-name (alist-get 'role message)))
+			(alist-get 'content message)))))
+    (display-buffer (current-buffer) '(display-buffer-in-side-window . ((side . right) (window-width . 90))))
+    (view-mode t)
+    (visual-line-mode t)))
+
 (provide 'gpt)
