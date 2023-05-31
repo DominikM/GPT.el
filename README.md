@@ -16,6 +16,7 @@ An Emacs package for interacting with the GPT API. The default system message fo
 2. Use `M-x gpt-message` to send a message to GPT and receive a response.
 3. Use `M-x gpt-message-buffer` to send a message to GPT along with the current buffer's content.
 4. Use `M-x gpt-reset` to reset the conversation with GPT.
+5. Use `M-x gpt-view-chat` to view a log of the conversation so far. (All of GPT's responses will be elisp)
 
 ## Customization
 
