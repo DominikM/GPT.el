@@ -43,7 +43,8 @@ Otherwise, you should default to using the function (message \"message from assi
 This code will be running in the Emacs Lisp evaluator.
 Try to avoid defining new functions.
 If the user responds with the debugger output, do not respond in plain text, just output the correct code.
-Some messages may include the text of the current buffer. When that is the case, there will be a \"BUFFER TEXT\" heading and a \"USER MESSAGE\" heading."
+Some messages may include the text of the current buffer. When that is the case, there will be a \"BUFFER TEXT\" heading and a \"USER MESSAGE\" heading.
+Some messages may include the text of the current region. When that is the case, there will be a \"REGION TEXT\" heading and a \"USER MESSAGE\" heading."
   "The system message sent to GPT"
   :type 'string
   :group 'gpt)
@@ -116,7 +117,16 @@ Some messages may include the text of the current buffer. When that is the case,
   (force-mode-line-update))
  
 (defun gpt--message-with-buffer (message)
-  (format "BUFFER TEXT\n%s\n\nUSER MESSAGE\n%s" (buffer-substring-no-properties (point-min) (point-max)) message))
+  (format "BUFFER TEXT\n%s\n\nUSER MESSAGE\n%s"
+	  (buffer-substring-no-properties (point-min) (point-max))
+	  message))
+
+(defun gpt--message-with-region (message)
+  (unless (use-region-p)
+    (user-error "No region selected."))
+  (format "REGION TEXT\n%s\n\nUSER MESSAGE\n%s"
+	  (buffer-substring-no-properties (region-beginning) (region-end))
+	  message))
 
 (defun gpt--send-request ()
   (let ((url-request-data (json-encode (gpt--get-request)))
@@ -146,10 +156,14 @@ Some messages may include the text of the current buffer. When that is the case,
     (gpt--add-user-chat message)
     (gpt--send-request)))
 
+(defun gpt--maybe-set-gpt-api-key ()'
+  (unless gpt-api-key
+    (setq gpt-api-key (read-string "Enter OpenAI API key: "))))
+  
+
 (defun gpt-message ()
   (interactive)
-  (unless gpt-api-key
-    (setq gpt-api-key (read-string "Enter OpenAI API key: ")))
+  (gpt--maybe-set-gpt-api-key)
   (let* ((message (read-string "Enter message: "))
 	 (valid (gpt--add-user-chat message)))
     (if valid
@@ -157,10 +171,17 @@ Some messages may include the text of the current buffer. When that is the case,
 
 (defun gpt-message-buffer ()
   (interactive)
-  (unless gpt-api-key
-    (setq gpt-api-key (read-string "Enter OpenAI API key: ")))
+  (gpt--maybe-set-gpt-api-key)
   (let* ((message (read-string "Enter message: "))
 	 (valid (gpt--add-user-chat (gpt--message-with-buffer message))))
+    (if valid
+	(gpt--send-request))))
+
+(defun gpt-message-region ()
+  (interactive)
+  (gpt--maybe-set-gpt-api-key)
+  (let* ((message (read-string "Enter message: "))
+	 (valid (gpt--add-user-chat (gpt--message-with-region message))))
     (if valid
 	(gpt--send-request))))
 
