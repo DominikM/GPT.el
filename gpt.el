@@ -74,6 +74,8 @@ Some messages may include the text of the current region. When that is the case,
 
 (defvar gpt--waiting nil)
 
+(defvar gpt--cached-buffer nil)
+
 (defun gpt--add-user-chat (message)
   (let ((token-count (/ (length message) 4)))
     (if (< token-count (alist-get 'max-tokens gpt-model))
@@ -92,7 +94,8 @@ Some messages may include the text of the current region. When that is the case,
       (let* ((form-pos (read-from-string content next-pos))
 	     (form (car form-pos))
 	     (pos (cdr form-pos)))
-	(eval form)
+	(with-current-buffer gpt--cached-buffer
+	  (eval form))
 	(gpt--eval-next-form content pos))))
 
 (defun gpt--eval-last-gpt-chat ()
@@ -129,6 +132,7 @@ Some messages may include the text of the current region. When that is the case,
 	  message))
 
 (defun gpt--send-request ()
+  (setq gpt--cached-buffer (current-buffer))
   (let ((url-request-data (json-encode (gpt--get-request)))
 	(url-request-method "POST")
 	(url-request-extra-headers `(("Authorization" . ,(format "Bearer %s" gpt-api-key)) ("Content-Type" . "application/json"))))
